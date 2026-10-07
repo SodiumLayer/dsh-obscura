@@ -38,7 +38,7 @@ for (const file of [...hostFiles, 'client.js']) {
 if (unchecked.length > 0) {
   process.stdout.write(`dsh-obscura-plugin: could not syntax-check ${unchecked.length} file(s) — a child process was refused here:\n`)
   for (const entry of unchecked) process.stdout.write(`  - ${entry}\n`)
-  process.stdout.write('  (run `node --test --test-isolation=none test/*.test.mjs` instead: it loads every module in-process)\n')
+  process.stdout.write('  (run `npm run test:no-isolation` instead: it loads every module in-process)\n')
 }
 
 const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))

@@ -15,10 +15,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The plugin runs on Windows and is verified there, but the host half is plain
-        # Node with zero runtime dependencies, so both platforms are worth guarding.
+        # Both platforms: the plugin is used on Windows and the host half is plain Node
+        # with zero runtime dependencies, so neither one is the "real" target.
+        # Both Node lines: `22.x` is the floor `engines` declares, `24.x` is the version
+        # this plugin is developed on — testing only one of them is how a
+        # Node-version-specific test invocation slipped through once already.
         os: [ubuntu-latest, windows-latest]
-        node: ['22.x']
+        node: ['22.x', '24.x']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

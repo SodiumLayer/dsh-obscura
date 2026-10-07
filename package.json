@@ -30,7 +30,8 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "check": "node scripts/build.mjs && node scripts/check.mjs && node scripts/verify-artifacts.mjs",
-    "test": "node --test --test-isolation=none test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "test:no-isolation": "node --test --test-isolation=none test/*.test.mjs"
   },
   "engines": {
     "node": ">=22.19"

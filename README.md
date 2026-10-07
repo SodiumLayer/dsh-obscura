@@ -61,7 +61,9 @@ node test/isolated-profile.mjs [--binary <obscura.exe>]   # 一次性 profile �
 node test/client-smoke-server.mjs 8766            # 然后浏览器打开 /test/client-smoke.html
 ```
 
-> `npm test` 用 `--test-isolation=none`：沙箱禁止子进程管道，node 测试运行器的默认隔离会触发 `spawn EPERM`。
+> `npm test` 用 node 自带的测试运行器，Node ≥22.19 都能跑（CI 同时跑 22.x 与 24.x）。
+> 若你的环境禁止测试运行器 fork 子进程、报 `spawn EPERM`，改用 `npm run test:no-isolation`：
+> 它在单个进程里跑同一批测试，代价是不同测试文件共享一个进程。
 >
 > 浏览器冒烟页从 CDN 取 React（宿主是在运行时注入的，本包不打包含 React）。**离线且无本地 React 副本时它会显式报告
 > `SKIPPED`**，不会伪装成通过或失败 —— 因此面板文案的回归由 `test/client-contract.test.mjs` 离线守住，
