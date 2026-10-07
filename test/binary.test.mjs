@@ -3,6 +3,11 @@
  * path may name either the executable or the folder holding it, a candidate that
  * cannot run is rejected rather than accepted, and failure at one location still
  * continues to the next instead of stopping the search.
+ *
+ * Fixture paths are built with `join` from a single root rather than written as
+ * backslash literals: `join('C:\\plugin\\bin', 'obscura.exe')` only ends in
+ * `\\obscura.exe` on Windows, so hand-written fixtures made these cases pass on
+ * Windows and fail on Linux while the production code was correct on both.
  */
 
 import assert from 'node:assert/strict'
@@ -16,9 +21,17 @@ import { BINARY_NAMES, findLocalBinary, parseVersion, resolveBinary } from '../s
 const fixtureWorkspace = mkdtempSync(join(tmpdir(), 'dsh-obscura-binary-'))
 after(() => rmSync(fixtureWorkspace, { recursive: true, force: true }))
 
-const BIN = 'C:\\plugin\\bin'
+/** Root of the fake filesystem: a Windows drive where there is one, `/` otherwise. */
+const DRIVE = process.platform === 'win32' ? 'C:\\' : '/'
+const BIN = join(DRIVE, 'plugin', 'bin')
 const PATHS = { binDir: BIN }
-const CUSTOM_DIR = 'C:\\Users\\me\\Downloads\\obscura-release'
+const CUSTOM_DIR = join(DRIVE, 'Users', 'me', 'Downloads', 'obscura-release')
+const BIN_EXE = join(BIN, 'obscura.exe')
+const TOOLS_EXE = join(DRIVE, 'tools', 'obscura.exe')
+const MINE_EXE = join(DRIVE, 'mine', 'obscura.exe')
+const BROKEN_EXE = join(DRIVE, 'broken', 'obscura.exe')
+const MISSING_EXE = join(DRIVE, 'missing', 'obscura.exe')
+const NESTED_DIR = join(CUSTOM_DIR, 'obscura-x86_64-windows-stealth')
 
 /**
  * Build a fake command runner plus fake filesystem for a scenario.
@@ -68,51 +81,51 @@ test('parseVersion reads the version out of obscura output', () => {
 
 test('the system PATH wins over the plugin bin folder', async () => {
   const h = harness({
-    where: 'C:\\tools\\obscura.exe\r\n',
-    files: ['C:\\tools\\obscura.exe', `${BIN}\\obscura.exe`],
-    versions: { 'C:\\tools\\obscura.exe': 'obscura 9.9.9' },
+    where: `${TOOLS_EXE}\r\n`,
+    files: [TOOLS_EXE, BIN_EXE],
+    versions: { [TOOLS_EXE]: 'obscura 9.9.9' },
   })
   const result = await resolveBinary(SETTINGS, PATHS, h.deps)
   assert.equal(result.source, 'path')
-  assert.equal(result.path, 'C:\\tools\\obscura.exe')
+  assert.equal(result.path, TOOLS_EXE)
   assert.equal(result.version, '9.9.9')
   assert.equal(result.error, null)
   // The PATH candidate answered, so the plugin copy was never executed.
-  assert.equal(h.calls.some(([file]) => file === `${BIN}\\obscura.exe`), false)
+  assert.equal(h.calls.some(([file]) => file === BIN_EXE), false)
 })
 
 test('the plugin bin folder is used when PATH has nothing', async () => {
   const h = harness({
     where: '',
-    files: [`${BIN}\\obscura.exe`],
-    versions: { [`${BIN}\\obscura.exe`]: 'obscura 0.2.3' },
+    files: [BIN_EXE],
+    versions: { [BIN_EXE]: 'obscura 0.2.3' },
   })
   const result = await resolveBinary(SETTINGS, PATHS, h.deps)
   assert.equal(result.source, 'plugin')
-  assert.equal(result.path, `${BIN}\\obscura.exe`)
+  assert.equal(result.path, BIN_EXE)
   assert.equal(result.version, '0.2.3')
 })
 
 test('a nested extraction folder inside bin is found', async () => {
-  const nested = `${BIN}\\obscura-x86_64-windows-stealth`
+  const nested = join(BIN, 'obscura-x86_64-windows-stealth')
   const h = harness({
     where: '',
     dirs: { [BIN]: ['obscura-x86_64-windows-stealth', 'README.txt'] },
-    files: [`${nested}\\obscura.exe`],
-    versions: { [`${nested}\\obscura.exe`]: 'obscura 0.2.3' },
+    files: [join(nested, 'obscura.exe')],
+    versions: { [join(nested, 'obscura.exe')]: 'obscura 0.2.3' },
   })
   const result = await resolveBinary(SETTINGS, PATHS, h.deps)
   assert.equal(result.source, 'plugin')
-  assert.equal(result.path, `${nested}\\obscura.exe`)
+  assert.equal(result.path, join(nested, 'obscura.exe'))
 })
 
 test('an explicit custom FILE outranks the PATH', async () => {
   const h = harness({
-    where: 'C:\\tools\\obscura.exe\r\n',
-    files: ['C:\\tools\\obscura.exe', 'C:\\mine\\obscura.exe'],
-    versions: { 'C:\\mine\\obscura.exe': 'obscura 1.2.3', 'C:\\tools\\obscura.exe': 'obscura 9.9.9' },
+    where: `${TOOLS_EXE}\r\n`,
+    files: [TOOLS_EXE, MINE_EXE],
+    versions: { [MINE_EXE]: 'obscura 1.2.3', [TOOLS_EXE]: 'obscura 9.9.9' },
   })
-  const result = await resolveBinary({ ...SETTINGS, binaryPath: 'C:\\mine\\obscura.exe' }, PATHS, h.deps)
+  const result = await resolveBinary({ ...SETTINGS, binaryPath: MINE_EXE }, PATHS, h.deps)
   assert.equal(result.source, 'custom')
   assert.equal(result.version, '1.2.3')
 })
@@ -124,82 +137,81 @@ test('a custom path that names a FOLDER resolves to the executable inside it', a
   const h = harness({
     where: '',
     dirs: { [CUSTOM_DIR]: ['obscura.exe', 'obscura-worker.exe'] },
-    files: [`${CUSTOM_DIR}\\obscura.exe`, `${CUSTOM_DIR}\\obscura-worker.exe`],
-    versions: { [`${CUSTOM_DIR}\\obscura.exe`]: 'obscura 0.2.3' },
+    files: [join(CUSTOM_DIR, 'obscura.exe'), join(CUSTOM_DIR, 'obscura-worker.exe')],
+    versions: { [join(CUSTOM_DIR, 'obscura.exe')]: 'obscura 0.2.3' },
   })
   const result = await resolveBinary({ ...SETTINGS, binaryPath: CUSTOM_DIR }, PATHS, h.deps)
   assert.equal(result.source, 'custom')
-  assert.equal(result.path, `${CUSTOM_DIR}\\obscura.exe`)
+  assert.equal(result.path, join(CUSTOM_DIR, 'obscura.exe'))
   assert.equal(result.version, '0.2.3')
   // The folder itself must never be executed.
   assert.equal(h.calls.some(([file]) => file === CUSTOM_DIR), false)
 })
 
 test('a custom folder whose executable sits one level deeper is still found', async () => {
-  const nested = `${CUSTOM_DIR}\\obscura-x86_64-windows-stealth`
   const h = harness({
     where: '',
     dirs: { [CUSTOM_DIR]: ['obscura-x86_64-windows-stealth'] },
-    files: [`${nested}\\obscura.exe`],
-    versions: { [`${nested}\\obscura.exe`]: 'obscura 0.2.3' },
+    files: [join(NESTED_DIR, 'obscura.exe')],
+    versions: { [join(NESTED_DIR, 'obscura.exe')]: 'obscura 0.2.3' },
   })
   const result = await resolveBinary({ ...SETTINGS, binaryPath: CUSTOM_DIR }, PATHS, h.deps)
   assert.equal(result.source, 'custom')
-  assert.equal(result.path, `${nested}\\obscura.exe`)
+  assert.equal(result.path, join(NESTED_DIR, 'obscura.exe'))
 })
 
 test('a custom folder with nothing executable in it falls back to PATH', async () => {
   const h = harness({
-    where: 'C:\\tools\\obscura.exe\r\n',
+    where: `${TOOLS_EXE}\r\n`,
     dirs: { [CUSTOM_DIR]: ['README.txt'] },
-    files: ['C:\\tools\\obscura.exe'],
-    versions: { 'C:\\tools\\obscura.exe': 'obscura 0.2.3' },
+    files: [TOOLS_EXE],
+    versions: { [TOOLS_EXE]: 'obscura 0.2.3' },
   })
   const result = await resolveBinary({ ...SETTINGS, binaryPath: CUSTOM_DIR }, PATHS, h.deps)
   assert.equal(result.source, 'path')
-  assert.equal(result.path, 'C:\\tools\\obscura.exe')
+  assert.equal(result.path, TOOLS_EXE)
 })
 
 test('a custom folder with nothing executable in it falls back to the plugin bin', async () => {
   const h = harness({
     where: '',
     dirs: { [CUSTOM_DIR]: ['README.txt'] },
-    files: [`${BIN}\\obscura.exe`],
-    versions: { [`${BIN}\\obscura.exe`]: 'obscura 0.2.3' },
+    files: [BIN_EXE],
+    versions: { [BIN_EXE]: 'obscura 0.2.3' },
   })
   const result = await resolveBinary({ ...SETTINGS, binaryPath: CUSTOM_DIR }, PATHS, h.deps)
   assert.equal(result.source, 'plugin')
-  assert.equal(result.path, `${BIN}\\obscura.exe`)
+  assert.equal(result.path, BIN_EXE)
 })
 
 test('a configured path that does not exist is skipped and the search continues', async () => {
   const h = harness({
     where: '',
-    files: [`${BIN}\\obscura.exe`],
-    versions: { [`${BIN}\\obscura.exe`]: 'obscura 0.2.3' },
+    files: [BIN_EXE],
+    versions: { [BIN_EXE]: 'obscura 0.2.3' },
   })
-  const result = await resolveBinary({ ...SETTINGS, binaryPath: 'D:\\missing\\obscura.exe' }, PATHS, h.deps)
+  const result = await resolveBinary({ ...SETTINGS, binaryPath: MISSING_EXE }, PATHS, h.deps)
   assert.equal(result.source, 'plugin')
 })
 
 test('a candidate that cannot run --version is rejected and the next one is tried', async () => {
   const h = harness({
-    where: 'C:\\broken\\obscura.exe\r\nC:\\tools\\obscura.exe\r\n',
-    files: ['C:\\broken\\obscura.exe', 'C:\\tools\\obscura.exe'],
-    versions: { 'C:\\broken\\obscura.exe': 3, 'C:\\tools\\obscura.exe': 'obscura 0.2.3' },
+    where: `${BROKEN_EXE}\r\n${TOOLS_EXE}\r\n`,
+    files: [BROKEN_EXE, TOOLS_EXE],
+    versions: { [BROKEN_EXE]: 3, [TOOLS_EXE]: 'obscura 0.2.3' },
   })
   const result = await resolveBinary(SETTINGS, PATHS, h.deps)
   assert.equal(result.source, 'path')
-  assert.equal(result.path, 'C:\\tools\\obscura.exe')
+  assert.equal(result.path, TOOLS_EXE)
 })
 
 test('a broken custom FILE still lets a working PATH candidate win', async () => {
   const h = harness({
-    where: 'C:\\tools\\obscura.exe\r\n',
-    files: ['C:\\broken\\obscura.exe', 'C:\\tools\\obscura.exe'],
-    versions: { 'C:\\broken\\obscura.exe': 1, 'C:\\tools\\obscura.exe': 'obscura 0.2.3' },
+    where: `${TOOLS_EXE}\r\n`,
+    files: [BROKEN_EXE, TOOLS_EXE],
+    versions: { [BROKEN_EXE]: 1, [TOOLS_EXE]: 'obscura 0.2.3' },
   })
-  const result = await resolveBinary({ ...SETTINGS, binaryPath: 'C:\\broken\\obscura.exe' }, PATHS, h.deps)
+  const result = await resolveBinary({ ...SETTINGS, binaryPath: BROKEN_EXE }, PATHS, h.deps)
   assert.equal(result.source, 'path')
 })
 
@@ -214,9 +226,9 @@ test('nothing anywhere resolves to source "none" with an explanation', async () 
 
 test('every candidate failing gives "none" rather than a bogus path', async () => {
   const h = harness({
-    where: 'C:\\broken\\obscura.exe\r\n',
-    files: ['C:\\broken\\obscura.exe'],
-    versions: { 'C:\\broken\\obscura.exe': 1 },
+    where: `${BROKEN_EXE}\r\n`,
+    files: [BROKEN_EXE],
+    versions: { [BROKEN_EXE]: 1 },
   })
   const result = await resolveBinary(SETTINGS, PATHS, h.deps)
   assert.equal(result.source, 'none')
@@ -231,9 +243,9 @@ test('the resolution never reports a search trail', async () => {
 })
 
 test('findLocalBinary prefers the direct binary over a nested one', () => {
-  const exists = (file) => file === BIN || file === `${BIN}\\obscura.exe` || file === `${BIN}\\nested\\obscura.exe`
+  const exists = (file) => file === BIN || file === join(BIN, 'obscura.exe') || file === join(BIN, 'nested', 'obscura.exe')
   const found = findLocalBinary(BIN, { exists, readdir: () => ['nested'] })
-  assert.deepEqual(found, [`${BIN}\\obscura.exe`])
+  assert.deepEqual(found, [join(BIN, 'obscura.exe')])
 })
 
 test('findLocalBinary returns nothing when the folder is absent or empty', () => {
