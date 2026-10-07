@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: node ${{ matrix.node }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The plugin runs on Windows and is verified there, but the host half is plain
+        # Node with zero runtime dependencies, so both platforms are worth guarding.
+        os: [ubuntu-latest, windows-latest]
+        node: ['22.x']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      # Builds lib/ and client.js, checks the manifest and the client bundle shape, and
+      # fails if any artifact is not byte-identical to the src/ module it came from.
+      - name: Build and check
+        run: npm run check
+      - name: Tests
+        run: npm test

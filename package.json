@@ -1,0 +1,74 @@
+{
+  "name": "dsh-obscura-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Obscura settings page for DeepSeek Harness: starts the obscura headless-browser MCP server with DSH, resolves its binary from PATH or this plugin's bin/ folder, and gives the settings page one-click probe, mount-test and MCP configuration for obscura.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "client.js",
+    "cordis.patch.yml",
+    "bin",
+    "!bin/*.exe",
+    "!bin/*.dll",
+    "src",
+    "test",
+    "scripts",
+    "README.md",
+    "INSTALL.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "node scripts/build.mjs && node scripts/check.mjs && node scripts/verify-artifacts.mjs",
+    "test": "node --test --test-isolation=none test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=22.19"
+  },
+  "dependencies": {},
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "obscura",
+    "mcp",
+    "headless-browser"
+  ],
+  "license": "MIT",
+  "author": "SodiumLayer",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SodiumLayer/dsh-obscura.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SodiumLayer/dsh-obscura/issues"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ]
+    },
+    "compatibility": {
+      "dsh": ">=0.2.0-rc.1 <0.3.0",
+      "profiles": [
+        "web",
+        "desktop"
+      ]
+    }
+  }
+}

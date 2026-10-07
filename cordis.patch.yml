@@ -1,0 +1,13 @@
+# dsh-obscura-plugin bundle layer.
+#
+# Applied automatically when this package is registered as a profile bundle
+# (`dsh plugin --profile web add <path-to-this-folder>`). It mounts the plugin's
+# host entry; the browser half is discovered from the same package's
+# `dsh.client` declaration (see package.json).
+#
+# This row only starts the plugin. Wiring the obscura MCP server into the
+# harness is done from the plugin's settings page ("Obscura" -> "一键配置 MCP"),
+# which writes an `mcp-obscura` row into the profile's cordis.patch.yml.
+- insert:
+    - id: obscura-mcp-host
+      name: 'dsh-obscura-plugin'

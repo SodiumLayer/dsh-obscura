@@ -1,0 +1,10 @@
+# Byte identity between src/ and lib/ (and between src/client/index.js and client.js) is
+# asserted by scripts/verify-artifacts.mjs, so line endings must not depend on the
+# machine that checked the repository out. Everything textual is stored as LF and
+# checked out as LF, whatever core.autocrlf says.
+* text=auto eol=lf
+
+# The obscura binaries are supplied by the user and are not committed (see .gitignore).
+# If one is ever added by hand, git must not try to diff or merge it.
+*.exe binary
+*.dll binary

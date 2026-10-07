@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# The obscura executables are supplied by whoever installs the plugin, never
+# committed: each release binary is ~80 MB, it belongs to the upstream project
+# rather than to this one, and bin/README.txt exists precisely to say where to
+# put it. Nothing else in bin/ is ignored.
+bin/*.exe
+bin/*.dll
+bin/*.so
+bin/obscura
+
+# Local runs and scratch
+dsh-obscura-verify-home/
+*.log
+*.tmp-*
+.DS_Store
+Thumbs.db

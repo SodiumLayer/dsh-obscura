@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>dsh-obscura-plugin client smoke test</title>
+  <style>body{font-family:system-ui,sans-serif;background:#111;color:#eee;margin:16px}pre{background:#000;padding:8px;white-space:pre-wrap}</style>
+</head>
+<body>
+  <h1>dsh-obscura-plugin · 面板冒烟测试</h1>
+  <p id="summary">running…</p>
+  <pre id="log"></pre>
+  <div id="panel" style="border:1px solid #444;padding:12px;border-radius:8px"></div>
+  <h2>状态二：找不到 obscura</h2>
+  <div id="panel-unavailable" style="border:1px solid #444;padding:12px;border-radius:8px"></div>
+
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script type="module">
+    const log = (line) => { document.getElementById('log').textContent += line + '\n' }
+    const fail = (message) => { document.getElementById('summary').textContent = 'FAIL: ' + message; document.getElementById('summary').style.color = '#e5534b' }
+
+    /**
+     * React comes from a CDN because the host injects it at runtime. This machine may
+     * be offline with no local copy — and a rendering test that cannot render must say
+     * so, not report a pass it did not earn nor a failure the plugin did not cause.
+     * The copy contract that does not need a DOM lives in client-contract.test.mjs.
+     */
+    const reactReady = await new Promise((resolve) => {
+      if (window.React !== undefined && window.ReactDOM !== undefined) return resolve(true)
+      let waited = 0
+      const timer = setInterval(() => {
+        if (window.React !== undefined && window.ReactDOM !== undefined) { clearInterval(timer); resolve(true) }
+        else if ((waited += 200) >= 4000) { clearInterval(timer); resolve(false) }
+      }, 200)
+    })
+    if (reactReady !== true) {
+      const skipped = document.getElementById('summary')
+      skipped.textContent = 'SKIPPED: React/ReactDOM 未能从 CDN 加载（本机离线，且无本地副本）——渲染类断言未执行'
+      skipped.style.color = '#d29922'
+      log('SKIPPED: window.React/ReactDOM unavailable; rendering assertions not executed')
+      log('the offline copy assertions live in test/client-contract.test.mjs')
+      window.__SMOKE__ = { skipped: true, reason: 'react-unavailable', failures: [] }
+    } else {
+
+    /** The panel's own host, stubbed: one route, same-origin, no token. */
+    const STATE = {
+      ok: true,
+      binary: { source: 'plugin', path: 'C:\\tools\\obscura.exe', version: '0.2.3', error: null },
+      server: { status: 'running', reason: '已由本插件启动（pid 4328，37 个工具）', port: 3000, pid: 4328, owned: true, startedAt: new Date().toISOString(), lastError: null, logTail: ['obscura: ready on port 3000 with 37 tools'], binary: 'x', version: '0.2.3' },
+      mcp: { entryId: 'mcp-obscura', clientPackage: '@deepseek-ai/dsh-mcp-client', serverName: 'obscura', transport: 'streamable-http', entryPresent: false, entryEnabled: false, url: 'http://localhost:3000/mcp', autoUrl: 'http://localhost:3000/mcp', urlOverride: '', entryUrl: null, inSync: true },
+      dock: { entryPresent: false, entryEnabled: false, toolCount: 0, tools: [], loaderAvailable: true, entryPhase: null },
+      env: { dshHome: 'C:\\Users\\you\\.dsh', profileDir: 'C:\\Users\\you\\.dsh\\profiles\\web', pluginRoot: 'C:\\plugins\\dsh-obscura', binDir: 'C:\\plugins\\dsh-obscura\\bin', binDirWritable: true, binDirExists: true, settingsPath: 'C:\\Users\\you\\.dsh\\dsh-obscura\\settings.json', patchPath: 'C:\\Users\\you\\.dsh\\profiles\\web\\cordis.patch.yml', logPath: 'C:\\Users\\you\\.dsh\\dsh-obscura\\obscura.log' },
+      settings: { port: 3000, autoStart: true, extraArgs: ['--http', '--host', '127.0.0.1', '--port', '3000', '--stealth'], mcpUrl: '', binaryPath: '', lastKnownBinary: 'C:\\tools\\obscura.exe' },
+      profile: 'web',
+    }
+
+    const calls = []
+    // The panel's fetch is stubbed, so keep the real one to load the bundle with.
+    const nativeFetch = window.fetch.bind(window)
+    /** Route the stub by endpoint so the switch and the args save can be exercised. */
+    window.fetch = async (url, options = {}) => {
+      const target = String(url)
+      const body = options.body === undefined ? undefined : JSON.parse(options.body)
+      calls.push({ url: target, method: options.method ?? 'GET', body })
+      log(`fetch ${options.method ?? 'GET'} ${target}${body === undefined ? '' : ` ${options.body}`}`)
+      let payload = STATE
+      if (target.includes('/mcp-test')) {
+        payload = { ok: true, service: { reachable: true, url: 'http://127.0.0.1:3000/mcp', latencyMs: 4, toolCount: 2, tools: ['fetch', 'scrape'], serverName: 'obscura', serverVersion: '0.2.3', error: null }, dock: { entryPresent: true, entryEnabled: true, toolCount: 2, tools: [], loaderAvailable: true, entryPhase: null, configuredUrl: STATE.mcp.url, expectedUrl: STATE.mcp.url, verdict: 'ok', nextStep: 'none' } }
+      } else if (target.includes('/mcp-config')) {
+        const enabling = body.action === 'enable'
+        STATE.mcp.entryPresent = enabling
+        STATE.mcp.entryEnabled = enabling
+        payload = { ok: true, written: true, outcome: enabling ? 'enabled' : 'disabled', conflict: null, entry: { entryId: 'mcp-obscura', url: STATE.mcp.url, present: enabling }, effective: 'restart', needsRestart: true }
+      } else if (target.includes('/settings')) {
+        const before = STATE.mcp.url
+        STATE.settings = { ...STATE.settings, ...(body ?? {}) }
+        // Mirror the host: the endpoint follows the port, or an explicit override.
+        const portFlag = STATE.settings.extraArgs.indexOf('--port')
+        const port = portFlag === -1 ? STATE.settings.port : Number(STATE.settings.extraArgs[portFlag + 1])
+        STATE.mcp.autoUrl = `http://localhost:${port}/mcp`
+        STATE.mcp.url = STATE.settings.mcpUrl === '' ? STATE.mcp.autoUrl : STATE.settings.mcpUrl
+        STATE.mcp.entryUrl = STATE.mcp.entryPresent ? STATE.mcp.url : null
+        STATE.mcp.inSync = true
+        payload = { ok: true, settings: STATE.settings, restarted: false, mcpSynced: STATE.mcp.entryPresent && before !== STATE.mcp.url, path: STATE.env.settingsPath }
+      }
+      return { ok: true, status: 200, headers: { get: () => 'application/json' }, text: async () => JSON.stringify(payload) }
+    }
+    window.open = (url) => { log(`window.open ${url}`); return null }
+
+    let registered = null
+    let localeRegistered = null
+    /** ns -> dictionaries, so `bind` can return the real string. */
+    const localeRegistry = {}
+
+    window.__ModuleLoader__ = {
+      load: (spec) => {
+        log(`__ModuleLoader__.load id=${spec.id}`)
+        const fakeRequire = (id) => {
+          if (id === 'react') return window.React
+          throw new Error(`unexpected require(${id})`)
+        }
+        const mod = spec.factory(fakeRequire)
+        registered = mod
+        log(`module exports: ${Object.keys(mod).join(', ')} name=${mod.name}`)
+        const ctx = {
+          effect: (callback, label) => { log(`effect ${label ?? ''}`); callback() },
+          locale: {
+            register: (ns, dictionaries) => { localeRegistry[ns] = dictionaries; localeRegistered = { ns, languages: Object.keys(dictionaries) }; log(`locale.register ${ns} [${Object.keys(dictionaries).join(',')}]`) },
+            // Resolve real translations so the rendered DOM can be searched for the
+            // strings the user actually sees, not for internal keys.
+            bind: (ns) => (key) => {
+              const zh = localeRegistry[ns]?.zh ?? {}
+              return zh[key] ?? key
+            },
+          },
+          slots: {
+            inject: (slot, callback) => { log(`slots.inject ${slot}`); callback() },
+            register: (spec, component) => { log(`slots.register id=${spec.id} order=${spec.order}`); registered = { ...registered, slotSpec: spec, component }; return () => {} },
+          },
+        }
+        mod.apply(ctx)
+        return mod
+      },
+    }
+
+    // Load the plugin's client bundle exactly as the host would: as a plain script.
+    const source = await nativeFetch('/client.js').then((response) => response.text())
+    log(`client.js loaded (${source.length} chars)`)
+    const script = document.createElement('script')
+    script.textContent = source
+    document.head.appendChild(script)
+
+    // Wait for the registered component's data fetch to settle, then render it.
+    await new Promise((resolve) => setTimeout(resolve, 600))
+
+    const summary = document.getElementById('summary')
+    const failures = []
+    if (registered === null) failures.push('the bundle did not call __ModuleLoader__.load')
+    if (registered?.slotSpec?.name !== 'settings.section') failures.push('the settings.section slot was not registered')
+    if (registered?.slotSpec?.order !== 62) failures.push(`unexpected order ${registered?.slotSpec?.order}`)
+    if (registered?.component === undefined) failures.push('no component was registered')
+    if (registered?.component !== undefined) {
+      try {
+        const root = ReactDOM.createRoot(document.getElementById('panel'))
+        root.render(React.createElement(registered.component, {}))
+        // The panel fetches /state from an effect after its first paint, so the
+        // request assertion belongs after this wait, not before it.
+        await new Promise((resolve) => setTimeout(resolve, 800))
+        if (!calls.some((call) => String(call.url).toLowerCase().includes('/dsh-obscura/api/state'))) failures.push('the panel never requested /state')
+        // Search the visible text: it is what a user (and a screenshot) actually sees.
+        const text = document.getElementById('panel').innerText
+        log(`rendered ${text.length} chars of visible text`)
+        for (const needle of ['Obscura 可执行文件', 'obscura 0.2.3', 'MCP 接入', '在 DSH 中配置 obscura MCP 服务', '自定义启动参数', '测试接入', '自动启动', '打开文件夹', '优先使用自定义路径', 'obscura-worker.exe']) {
+          if (!text.toLowerCase().includes(needle.toLowerCase())) failures.push(`rendered panel is missing «${needle}»`)
+        }
+        // Removed by request, in this and the previous round.
+        for (const gone of ['测试系统变量', '已尝试的位置', 'where.exe', '一键配置 MCP', '撤销配置', 'dsh-mcp-manager', '启用 stealth 模式', '端口留空', '两段分开看']) {
+          if (text.includes(gone)) failures.push(`rendered panel still shows «${gone}»`)
+        }
+        // The service controls are exactly start / restart / stop.
+        const controlLabels = [...document.querySelectorAll('#panel button')].map((button) => button.textContent.trim())
+        for (const wanted of ['启动服务', '重启服务', '停止服务']) {
+          if (!controlLabels.includes(wanted)) failures.push(`control button missing «${wanted}»`)
+        }
+        if (controlLabels.includes('重试')) failures.push('the service controls still show a retry button')
+
+        // Copy rules the user asked for: no trailing full stops on explanations, and no
+        // inline explanation under the arguments box.
+        if (text.includes('。')) failures.push(`the panel still uses trailing full stops: «${text.slice(Math.max(0, text.indexOf('。') - 30), text.indexOf('。') + 2)}»`)
+        if (text.includes('按空格分隔')) failures.push('the arguments explanation is still shown')
+        if (text.includes('留空 = 按')) failures.push('the old custom-path wording is still shown')
+        if (!text.includes('自定义可执行文件路径（留空则按 PATH → bin目录 的顺序自动查找）')) {
+          failures.push('the custom-path label does not use the requested wording')
+        }
+        if (text.includes('留空 = 随 --port 自动生成')) failures.push('the MCP endpoint hint is still shown')
+        if (text.includes('（PATH 优先）')) failures.push('the trailing "PATH 优先" note is still shown')
+
+        // The arguments box is prefilled from the stored settings, including the
+        // bootstrap flags — they are the user's to edit, not hidden in the code.
+        const argsInput = [...document.querySelectorAll('#panel input[type=text]')].find((input) => input.placeholder.includes('--stealth'))
+        if (argsInput === undefined) failures.push('the custom startup arguments box was not found')
+        else if (argsInput.value !== '--http --host 127.0.0.1 --port 3000 --stealth') {
+          failures.push(`the arguments box shows «${argsInput.value}» instead of the stored args`)
+        }
+
+        // Saving the box sends the parsed list, not a hard-coded one. React only sees
+        // a programmatic edit through the native value setter, so use that here.
+        if (argsInput !== undefined) {
+          // Scope to this field's own row: several sections have a «保存» button.
+          const argsSave = argsInput.closest('div')?.querySelector('button')
+          const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+          nativeSetter.call(argsInput, '--http --port 4123 "--user-agent" "Agent One"')
+          argsInput.dispatchEvent(new Event('input', { bubbles: true }))
+          await new Promise((resolve) => setTimeout(resolve, 150))
+          if (argsSave !== undefined) {
+            argsSave.click()
+            await new Promise((resolve) => setTimeout(resolve, 600))
+            const settingsCall = calls.filter((call) => call.url.includes('/settings')).pop()
+            const sent = settingsCall?.body?.extraArgs
+            const expected = ['--http', '--port', '4123', '--user-agent', 'Agent One']
+            if (JSON.stringify(sent) !== JSON.stringify(expected)) {
+              failures.push(`the arguments box sent ${JSON.stringify(sent)} instead of ${JSON.stringify(expected)}`)
+            }
+          } else {
+            failures.push('the arguments save button was not found')
+          }
+        }
+
+        // The endpoint box: prefilled with the override (empty here), placeholder shows
+        // the derived value, and saving it sends mcpUrl.
+        const urlInput = [...document.querySelectorAll('#panel input[type=text]')].find((input) => input.placeholder.includes('localhost:'))
+        if (urlInput === undefined) failures.push('the MCP endpoint box was not found')
+        else {
+          if (urlInput.value !== '') failures.push(`the endpoint box should show the stored override, got «${urlInput.value}»`)
+          if (!urlInput.placeholder.includes('/mcp')) failures.push(`the endpoint placeholder should be the derived URL, got «${urlInput.placeholder}»`)
+          const urlSave = urlInput.closest('div')?.querySelector('button')
+          const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+          nativeSetter.call(urlInput, 'http://127.0.0.1:9911/mcp')
+          urlInput.dispatchEvent(new Event('input', { bubbles: true }))
+          await new Promise((resolve) => setTimeout(resolve, 150))
+          if (urlSave === undefined) failures.push('the endpoint save button was not found')
+          else {
+            urlSave.click()
+            await new Promise((resolve) => setTimeout(resolve, 500))
+            const sent = calls.filter((call) => call.url.includes('/settings')).pop()?.body
+            if (sent?.mcpUrl !== 'http://127.0.0.1:9911/mcp') failures.push(`the endpoint box sent ${JSON.stringify(sent)}`)
+            // The panel must show what the harness will actually be told to mount.
+            if (!document.getElementById('panel').innerText.includes('http://127.0.0.1:9911/mcp')) {
+              failures.push('the panel does not show the new endpoint after saving it')
+            }
+          }
+        }
+
+        // A file that disagrees with the settings is called out, not hidden.
+        STATE.mcp.entryPresent = true
+        STATE.mcp.entryEnabled = true
+        STATE.mcp.entryUrl = 'http://localhost:1234/mcp'
+        STATE.mcp.inSync = false
+        const mismatchRoot = ReactDOM.createRoot(document.getElementById('panel-unavailable'))
+        mismatchRoot.render(React.createElement(registered.component, {}))
+        await new Promise((resolve) => setTimeout(resolve, 700))
+        if (!document.getElementById('panel-unavailable').innerText.includes('不一致')) {
+          failures.push('a configuration entry that points elsewhere is not called out')
+        }
+        STATE.mcp.entryUrl = null
+        STATE.mcp.inSync = true
+
+        // The MCP switch reflects the configuration and writes it through on click.
+        const mcpSwitch = [...document.querySelectorAll('#panel input[type=checkbox]')].find((box) => box.closest('div')?.innerText.includes('在 DSH 中配置'))
+        if (mcpSwitch === undefined) failures.push('the MCP configuration switch was not found')
+        else if (mcpSwitch.checked !== false) failures.push('the MCP switch should start off when no entry exists')
+        else {
+          mcpSwitch.click()
+          await new Promise((resolve) => setTimeout(resolve, 700))
+          const configCall = calls.filter((call) => call.url.includes('/mcp-config')).pop()
+          if (configCall === undefined) failures.push('toggling the MCP switch never called /mcp-config')
+          else if (configCall.body?.action !== 'enable') failures.push(`toggling the MCP switch sent action «${configCall.body?.action}»`)
+          if (![...document.querySelectorAll('#panel input[type=checkbox]')].some((box) => box.checked && box.closest('div')?.innerText.includes('在 DSH 中配置'))) {
+            failures.push('the MCP switch did not reflect the newly written configuration')
+          }
+        }
+      } catch (error) {
+        failures.push(`render threw: ${error}`)
+      }
+    }
+
+    // Second state: nothing installed anywhere. The panel must then offer the
+    // download button with the proxy caveat, and still no search trail.
+    STATE.binary = { source: 'none', path: '', version: '', error: '未找到 obscura：系统 PATH 与插件 bin 目录都没有可执行文件' }
+    STATE.server = { status: 'binary-missing', reason: '没有可用的 obscura 可执行文件', port: 3000, pid: null, owned: false, startedAt: '', lastError: null, logTail: [], binary: '', version: '' }
+    if (registered?.component !== undefined) {
+      try {
+        const root = ReactDOM.createRoot(document.getElementById('panel-unavailable'))
+        root.render(React.createElement(registered.component, {}))
+        await new Promise((resolve) => setTimeout(resolve, 600))
+        const unavailableText = document.getElementById('panel-unavailable').innerText
+        for (const needle of ['下载最新发行版', '自备代理', '不可用']) {
+          if (!unavailableText.includes(needle)) failures.push(`unavailable state is missing «${needle}»`)
+        }
+        if (unavailableText.includes('已尝试的位置')) failures.push('unavailable state still shows the search trail')
+      } catch (error) {
+        failures.push(`unavailable-state render threw: ${error}`)
+      }
+    }
+
+    if (failures.length === 0) { summary.textContent = 'PASS: 面板注册并渲染成功'; summary.style.color = '#3fb950' }
+    else fail(failures.join(' | '))
+    window.__SMOKE__ = { failures, calls, slot: registered?.slotSpec?.id ?? null, order: registered?.slotSpec?.order ?? null }
+    }
+  </script>
+</body>
+</html>
