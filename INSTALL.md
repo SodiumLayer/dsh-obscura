@@ -30,7 +30,7 @@ dsh plugin --profile web add github:SodiumLayer/dsh-obscura
 
 > 前文提到了插件的调用顺序为：**自定义路径 → 系统 PATH → 插件 `bin\` 目录**。
 所以你也可以下载完Obscura本体后将其可执行文件所在的文件夹的路径复制到本插件的自定义可执行文件路径中，此时插件会优先调用自定义文件路径下的可执行文件，或假如你使用过Obscura并已经配置好系统环境变量此时插件可以直接识别并不需要额外设置
-> 
+
 ---
 
 ## 4. 接入 MCP（让 Agent 真正能用上）
@@ -43,7 +43,7 @@ dsh plugin --profile web add github:SodiumLayer/dsh-obscura
 
 ## 5 自定义启动参数
 
-可自定义启动Obscura时传入的参数如 “--http” “--stealth” “--port”
+可自定义启动Obscura时传入的参数如 “--http” “--host” “--port” “--stealth”
 
 ---
 
