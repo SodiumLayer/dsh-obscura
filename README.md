@@ -1,19 +1,12 @@
 # dsh-obscura-plugin
 
-DeepSeek Harness 的 **Obscura** 设置页插件：集中配置 [obscura](https://github.com/h4ckf0r0day/obscura) 无头浏览器的 MCP 服务。
+DeepSeek Harness 的 **Obscura** 懒人插件：在DeepSeek Harness启动时自动拉起 [obscura](https://github.com/h4ckf0r0day/obscura) 的 MCP 服务
 
-安装与使用见 **[INSTALL.md](./INSTALL.md)**。
+安装与使用的详细说明见 **[INSTALL.md](./INSTALL.md)**。
 
-```bash
-git clone https://github.com/SodiumLayer/dsh-obscura.git
-dsh plugin --profile web add ./dsh-obscura
-# 重启 DSH；obscura 本体请自行下载后放进 dsh-obscura/bin/（见 INSTALL.md 第 4 步）
+```powershell
+dsh plugin --profile web add github:SodiumLayer/dsh-obscura
 ```
-
-> 仓库里**不含** obscura 的二进制：`bin/*.exe` 被 `.gitignore` 忽略（每个约 80 MB，且属于上游项目）。
-> `lib/` 与 `client.js` 是构建产物，但**已提交**——所以 clone 下来即可用，不必先跑构建。
-
----
 
 ## 它做什么
 
@@ -40,47 +33,10 @@ dsh plugin --profile web add ./dsh-obscura
 - **配置行是设置的投影，不是第二个真源**：`cordis.patch.yml` 里那一行由 `effectiveMcpUrl()` 生成并随设置自动重写。曾经两者各自演化，导致面板测的是新端口、harness 指着旧端口 —— 面板现在还会在两者不一致时明确报警，而不是把旧值当「服务段」显示出来。
 - **状态只有一个真源**：MCP 开关反映的是 `cordis.patch.yml` 里那一行是否存在，而不是「是否已挂载」；挂载与否由「测试接入」的接入段报告。两者不混为一谈。
 - **一个开关只留一处**：`stealth` 曾是独立设置项，现在被折算进启动参数（旧的 `stealth: true` 会自动迁移），面板上每个能改变行为的项都看得见、改得动。
-- **不阻断 DSH**：obscura 的任何失败都收敛为面板上的一个状态与一行原因，而不是启动异常。
+- **不阻断 DSH**：Obscura 的任何失败都收敛为面板上的一个状态与一行原因，而不是启动异常。
 - **采用宿主事实**：profile 的 `dir` / `patchPath` 取自主机的 `profileContext`，不靠猜 —— 否则自定义 profile 会改错文件。
 
 ---
-
-## 开发
-
-```bash
-npm run build     # src/ -> lib/ 与 client.js
-npm run check     # 构建 + 语法/清单/client 形态 + 产物与源码逐字一致（防漏同步）
-npm test          # 单元测试 + 面板文案契约（167 条）
-```
-
-实机验证脚本（需要真实 obscura 与可写的 DSH_HOME）：
-
-```bash
-node test/live-obscura.mjs <obscura.exe> [port]   # 起真服务并列出 MCP 工具
-node test/isolated-profile.mjs [--binary <obscura.exe>]   # 一次性 profile 端到端验收 + 现状哈希回归
-node test/client-smoke-server.mjs 8766            # 然后浏览器打开 /test/client-smoke.html
-```
-
-> `npm test` 用 node 自带的测试运行器，Node ≥22.19 都能跑（CI 同时跑 22.x 与 24.x）。
-> 若你的环境禁止测试运行器 fork 子进程、报 `spawn EPERM`，改用 `npm run test:no-isolation`：
-> 它在单个进程里跑同一批测试，代价是不同测试文件共享一个进程。
->
-> 浏览器冒烟页从 CDN 取 React（宿主是在运行时注入的，本包不打包含 React）。**离线且无本地 React 副本时它会显式报告
-> `SKIPPED`**，不会伪装成通过或失败 —— 因此面板文案的回归由 `test/client-contract.test.mjs` 离线守住，
-> 渲染类断言只在 React 可用时执行。
-
-## 目录
-
-```
-src/          宿主半源码（9 个模块，每个一个职责）
-src/client/   设置页面板源码
-lib/          宿主半产物（= src/ 逐字复制，已提交）
-client.js     面板产物（= src/client/index.js 逐字复制，已提交）
-test/         单元测试 + live-obscura.mjs + isolated-profile.mjs + 浏览器冒烟页
-scripts/      build / verify-artifacts / check
-bin/          用户自备的 obscura.exe 放这里（二进制不入库，见 bin/README.txt）
-.github/      CI（Ubuntu + Windows，Node 22）
-```
 
 ## 许可
 
@@ -90,7 +46,7 @@ bin/          用户自备的 obscura.exe 放这里（二进制不入库，见 b
 
 ## 非官方声明
 
-本项目是第三方插件，与 **DeepSeek**（DeepSeek Harness 的宿主）及 **[obscura](https://github.com/h4ckf0r0day/obscura)** 上游均无隶属关系，亦未获其背书；相关名称与商标归各自所有者。
+本项目是第三方插件，与 **DeepSeek**（DeepSeek Harness）及 **[Obscura](https://github.com/h4ckf0r0day/obscura)** 上游均无隶属关系，亦未获其背书；相关名称与商标归各自所有者
 
-本仓库**不包含、也不分发** obscura 的任何二进制或源码：`bin/*.exe` 请自行从上游获取，并自行遵循其许可条款（obscura 上游为 Apache-2.0）。
+本仓库**不包含、也不分发** obscura 的任何二进制或源码：`bin/*.exe` 请自行从上游获取，并自行遵循其许可条款
 
