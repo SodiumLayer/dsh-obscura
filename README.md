@@ -18,7 +18,6 @@ dsh plugin --profile web add github:SodiumLayer/dsh-obscura
 | 一键测试 harness 是否已接入 obscura MCP | 「测试接入」分两段：**服务段**直接请求面板上那个 MCP 接入地址做 `initialize` + `tools/list`；**接入段**读 loader 条目与 `mcp__obscura__*` 工具数 —— 分开才能区分「服务没跑」与「服务在跑但没接入」 |
 | MCP 配置开关 + 接入地址 | 开关：**开** = 在 profile 的 `cordis.patch.yml` 写入/复用它的一行 `mcp-obscura`；**关** = 移除该行。旁边的**接入地址**文本框留空则随 `--port` 自动生成 `http://localhost:<端口>/mcp`，填写则用你的地址；端口/地址变化时配置行**自动跟随**，手工改歪了会被明确提示不一致 |
 | 服务控制 | **启动服务 / 重启服务 / 停止服务** 三个按钮，外加一个**自定义启动参数**文本框：插件只固定子命令 `mcp`，host、port、stealth、proxy 等全部由这个框决定（默认 `--http --host 127.0.0.1 --port 3000`） |
-| 其余界面取舍 | 不显示 `where` 结果/候选列表/verdict；不显示端口输入框与 stealth 复选框（改为启动参数）；不显示 MCP 管理器入口 |
 
 ---
 
