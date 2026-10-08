@@ -11,7 +11,7 @@ dsh plugin --profile web add github:SodiumLayer/dsh-obscura
 ```
 或在 DeepSeek Harness 的侧边栏选择 **插件** 再点击右侧的 **添加插件** 再输入 github:SodiumLayer/dsh-obscura 
 
-## 2. 确认 obscura 可用
+## 2. 确认 Obscura 可用
 
 启动 DSH 后进入 **设置页 → Obscura**
 当 **当前状态** 显示为已由本插件启动即代表服务可用
@@ -22,21 +22,23 @@ dsh plugin --profile web add github:SodiumLayer/dsh-obscura
 
 ---
 
-## 3. 如何放置 obscura 可执行文件
+## 3. 如何放置 Obscura 可执行文件
 
 1. 在 Obscura 页点击 **「打开文件夹」**，会打开插件的 `bin\` 目录
 2. 从下载页解压后，把 `obscura.exe`和`obscura-worker.exe`，一并放入进去
 3. 回到面板点击 **「重启服务」**，状态应变为「运行中」，并显示工具数量
 
 > 前文提到了插件的调用顺序为：**自定义路径 → 系统 PATH → 插件 `bin\` 目录**
-> 所以你也可以下载完Obscura本体后将其可执行文件所在的文件夹的路径复制到本插件的自定义可执行文件路径中，此时插件会优先调用自定义文件路径下的可执行文件，或假如你使用过Obscura并已经配置好系统环境变量此时插件可以直接识别并不需要额外设置
+
+所以你也可以下载完Obscura本体后将其可执行文件所在的文件夹的路径复制到本插件的自定义可执行文件路径中，此时插件会优先调用自定义文件路径下的可执行文件
+<br>假如你使用过Obscura并已经配置好系统环境变量此时插件可以直接识别并不需要额外设置</br>
 
 ---
 
 ## 4. 接入 MCP（让 Agent 真正能用上）
 
 打开 **设置页 → Obscura → MCP 接入** 中的 “在 DSH 中配置 obscura MCP 服务” 开关即可自动配置
-你可以点击 “测试接入” 按钮测试你的DeepSeek Harness是否已经完成挂载
+<br>你可以点击 “测试接入” 按钮测试你的DeepSeek Harness是否已经完成挂载</br>
 通常在初次启动服务或重启服务后可能需要 **重启一次 DSH** 才能完成挂载
 
 ---
