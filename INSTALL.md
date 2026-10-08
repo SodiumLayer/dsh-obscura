@@ -39,7 +39,6 @@ dsh plugin --profile web add github:SodiumLayer/dsh-obscura
 
 打开 **设置页 → Obscura → MCP 接入** 中的 “在 DSH 中配置 obscura MCP 服务” 开关即可自动配置
 <br>你可以点击 “测试接入” 按钮测试你的DeepSeek Harness是否已经完成挂载</br>
-通常在初次启动服务或重启服务后可能需要 **重启一次 DSH** 才能完成挂载
 
 ---
 
